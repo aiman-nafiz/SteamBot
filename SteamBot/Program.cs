@@ -245,6 +245,20 @@ namespace SteamBot
             }
         }
 
+        static void OnFriendsList(SteamFriends.FriendsListCallback callback)
+        {
+            Thread.Sleep(TimeSpan.FromSeconds(30));
+            foreach (var friend in callback.FriendList)
+            {
+                if (friend.Relationship == EFriendRelationship.RequestRecipient)
+                {
+                    steamFriends.AddFriend(friend.SteamID);
+                    Thread.Sleep(500);
+                    steamFriends.SendChatMessage(friend.SteamID, EChatEntryType.ChatMsg, "Hello! I'm Now Your Friend!");
+                }
+            }
+        }
+
         public static string[] seperate(int number, char seperator, string thestring)
         {
             string[] returned = new string[4];
