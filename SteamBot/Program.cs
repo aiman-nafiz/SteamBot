@@ -16,6 +16,7 @@ namespace SteamBot
         static SteamClient steamClient;
         static CallbackManager manager;
         static SteamUser steamUser;
+        static SteamFriends steamFriends;
         static string authCode, twoFactorAuth;
         static bool isRunning;
 
@@ -23,6 +24,12 @@ namespace SteamBot
         static void Main(string[] args)
 
         {
+            if (!File.Exists("chat.txt"))
+            {
+                File.Create("chat.txt").Close();
+                File.WriteAllText("chat.txt", "abc | 123");
+            }
+
             Console.Title = "Steam Bot Beta V0.1";
             Console.WriteLine("CTRL+C To Quit.....");
 
@@ -35,12 +42,15 @@ namespace SteamBot
             steamClient = new SteamClient();
             manager = new CallbackManager(steamClient);
             steamUser = steamClient.GetHandler<SteamUser>();
+            steamFriends = steamClient.GetHandler<SteamFriends>();
 
             manager.Subscribe<SteamClient.ConnectedCallback>(OnConnected);
             manager.Subscribe<SteamClient.DisconnectedCallback>(OnDisconnected);
 
             manager.Subscribe<SteamUser.LoggedOnCallback>(OnLoggedOn);
             manager.Subscribe<SteamUser.LoggedOffCallback>(OnloggedOff);
+            manager.Subscribe<SteamUser.AccountInfoCallback>(OnAccountInfo);
+            manager.Subscribe<SteamFriends.FriendMsgCallback>(OnChatMessage);
 
             manager.Subscribe<SteamUser.UpdateMachineAuthCallback>(OnMachineAuth);
 
@@ -163,6 +173,115 @@ namespace SteamBot
                 SentryFileHash = sentryHash,
             });
             Console.WriteLine("Done Saving SentryFile...");
+        }
+
+        static void OnAccountInfo(SteamUser.AccountInfoCallback callback)
+        {
+            steamFriends.SetPersonaState(EPersonaState.Online);
+        }
+
+        static void OnChatMessage(SteamFriends.FriendMsgCallback callback)
+        {
+            string[] args;
+            if (callback.EntryType == EChatEntryType.ChatMsg)
+            {
+                if (callback.Message.Length > 1)
+                {
+                    if (callback.Message.Remove(1) == "!")
+                    {
+                        string command = callback.Message;
+                        if (callback.Message.Contains(" "))
+                        {
+                            command = callback.Message.Remove(callback.Message.IndexOf(' '));
+                        }
+
+                        switch (command)
+                        {
+                            case "!send":
+                                args = seperate(2, ' ', callback.Message);
+                                Console.WriteLine("!send " + args[1] + args[2] +" command receive. User: " + steamFriends.GetFriendPersonaName(callback.Sender));
+                                if (args[0] == "-1")
+                                {
+                                    steamFriends.SendChatMessage(callback.Sender, EChatEntryType.ChatMsg, "Wrong Commnand Syntax: !send [friend] [message]");
+                                    return;
+                                }
+                                for (int i = 0; i < steamFriends.GetFriendCount(); i++)
+                                {
+                                    SteamID friend = steamFriends.GetFriendByIndex(i);
+                                    if (steamFriends.GetFriendPersonaName(friend).ToLower().Contains(args[1].ToLower()))
+                                    {
+                                        steamFriends.SendChatMessage(friend, EChatEntryType.ChatMsg, args[2]);
+                                    }
+                                }
+                                    break;
+                        }
+                    }
+                }
+            }
+            string rline;
+            string trimmed = callback.Message;
+            char[] trim = { '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '_', '=', '+', '[', ']', '{', '}', '\\', '|', ';', ':', '"', '\'', ',', '<', '.', '>', '/', '?' };
+
+            for (int i = 0; i < 30; i++)
+            {
+                trimmed = trimmed.Replace(trim[i].ToString(), "");
+            }
+
+            StreamReader cReader = new StreamReader("chat.txt");
+
+            while((rline = cReader.ReadLine()) != null)
+            {
+                string text = rline.Remove(rline.IndexOf('|') - 1);
+                string msg = rline.Remove(0, rline.IndexOf('|') + 2);
+
+                if(callback.Message.Contains(text))
+                {
+                    steamFriends.SendChatMessage(callback.Sender, EChatEntryType.ChatMsg, msg);
+                    cReader.Close();
+                    return;
+                }
+            }
+        }
+
+        public static string[] seperate(int number, char seperator, string thestring)
+        {
+            string[] returned = new string[4];
+
+            int i = 0;
+
+            int error = 0;
+
+            int length = thestring.Length;
+
+            foreach(char c in thestring)
+            {
+                if (i != number)
+                {
+                    if (error > length || number > 5)
+                    {
+                        returned[0] = "-1";
+                        return returned;
+                    }
+                    else if (c == seperator)
+                    {
+                        returned[1] = thestring.Remove(thestring.IndexOf(c));
+                        thestring = thestring.Remove(0, thestring.IndexOf(c) + 1);
+                        i++;
+                    }
+                    error++;
+
+                    if (error == length && i != number)
+                    {
+                        returned[0] = "-1";
+                        return returned;
+                    }
+                }
+                else
+                {
+                    returned[i] = thestring;
+                }
+            }
+            return returned;
         }
     }
 }
