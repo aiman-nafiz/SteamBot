@@ -30,6 +30,12 @@ namespace SteamBot
                 File.WriteAllText("chat.txt", "abc | 123");
             }
 
+            if (!File.Exists("admin.txt"))
+            {
+                File.Create("admin.txt").Close();
+                File.WriteAllText("admin.txt", "Please Insert Your steamID64");
+            }
+
             Console.Title = "Steam Bot Beta V0.1";
             Console.WriteLine("CTRL+C To Quit.....");
 
@@ -199,7 +205,11 @@ namespace SteamBot
 
                         switch (command)
                         {
+                            #region Send
                             case "!send":
+                                if (!isBotAdmin(callback.Sender))
+                                    break;
+
                                 args = seperate(2, ' ', callback.Message);
                                 Console.WriteLine("!send " + args[1] + args[2] +" command receive. User: " + steamFriends.GetFriendPersonaName(callback.Sender));
                                 if (args[0] == "-1")
@@ -216,6 +226,47 @@ namespace SteamBot
                                     }
                                 }
                                     break;
+#endregion
+                            #region Friend
+                            case "!friend":
+                                args = seperate(1, ' ', callback.Message);
+                                Console.WriteLine("!friend " + args[1] + " | " + steamFriends.GetFriendPersonaName(Convert.ToUInt64(args[1])) + "command has been received! User: " + steamFriends.GetFriendPersonaName(callback.Sender));
+
+                                if (args[0] == "-1")
+                                {
+                                    steamFriends.SendChatMessage(callback.Sender, EChatEntryType.ChatMsg, "Wrong Commnand Syntax: !friend [SteamID]");
+                                    return;
+                                }
+
+                                try
+                                {
+                                    SteamID validSTD = Convert.ToUInt64(args[1]);
+                                    if (!validSTD.IsValid)
+                                    {
+                                        steamFriends.SendChatMessage(callback.Sender, EChatEntryType.ChatMsg, "Invalid SteamID");
+                                    }
+                                    steamFriends.AddFriend(validSTD);
+                                }
+                                catch (FormatException)
+                                {
+                                    steamFriends.SendChatMessage(callback.Sender, EChatEntryType.ChatMsg, "Invalid SteamID64");
+                                }
+                                break;
+                            #endregion
+                            #region changename
+                            case "!changename":
+                                if (!isBotAdmin(callback.Sender))
+                                    return;
+                                args = seperate(1, ' ', callback.Message);
+                                Console.WriteLine("!changename " + args[1] + " command received! USer: " + steamFriends.GetFriendPersonaName(callback.Sender));
+                                if (args[0] == "-1")
+                                {
+                                    steamFriends.SendChatMessage(callback.Sender, EChatEntryType.ChatMsg, "Wrong Commnand Syntax: !changename [name]");
+                                    return;
+                                }
+                                steamFriends.SetPersonaName(args[1]);
+                                break;
+                            #endregion
                         }
                     }
                 }
@@ -256,6 +307,27 @@ namespace SteamBot
                     Thread.Sleep(500);
                     steamFriends.SendChatMessage(friend.SteamID, EChatEntryType.ChatMsg, "Hello! I'm Now Your Friend!");
                 }
+            }
+        }
+
+        public static bool isBotAdmin(SteamID steamid)
+        {
+            try
+            {
+                if(steamid.ConvertToUInt64() == Convert.ToUInt64(File.ReadAllText("admin.txt")))
+                {
+                    return true;
+                }
+
+                steamFriends.SendChatMessage(steamid, EChatEntryType.ChatMsg, "You Are Not A Bot Admin...");
+                Console.WriteLine(steamFriends.GetFriendPersonaName(steamid) + " are attempted to use as admin while not an admin!");
+
+                return false;
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return false;
             }
         }
 
